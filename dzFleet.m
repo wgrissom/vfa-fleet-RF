@@ -91,6 +91,7 @@ for jj = 2:Nseg
     if winTruncFact < zPadFact % then we need to apply windowing
         winLen = (winTruncFact-1)*N;
         Npad = N*zPadFact - winTruncFact*N;
+        % TODO: Replace with a tukeywin (built-in MATLAB func)? 
         window = blackman((winTruncFact-1)*N);
         % split it in half; stick N zeros in the middle
         window = [window(1:winLen/2);ones(N,1);window(winLen/2+1:end)];
