@@ -7,12 +7,18 @@
 %   3) Design current pulse, calculate Mz profile after it
 %   4) Go to (2) until last pulse. 
 
+% How much B1 sensitivity is there, couple with B0? Is it worse than conventional VFA?
+% Will want to try SMS. Blips can push echoes apart. Could set it up to be
+% roughly uniform across a range of B1. Also they get a navigator and it
+% could be OK to change last flip angle for example to avoid overflip, so
+% long as the drop in signal is consistent across B1 amplitudes. 
+
 addpath util/
 
 % parameters
 Nseg = 4; % number of segments
 tb = 4; % time-bandwidth product
-N = 64; % number of time points in the first segment pulse
+N = 2000; % number of time points in the first segment pulse
 zPadFact = 4;   % zero-pad factor; keep high to capture increasing spatial
                 % frequencies in the slice profile with each segment
 cancelAlphaPhs = true;  % cancel the alpha phase using the beta polynomial
@@ -62,9 +68,9 @@ B = ft(b(:,1));
 Mxy(:,1) = 2*conj(A(:)).*B; % this is the magnetization profile we want all
                             % other pulses to produce
 
-% Next pulse's Mxy profile will be Mz*2*a*b = Mz*2*sqrt(1-abs(B).^2)*B. 
+% Amplitude of next pulse's Mxy profile will be |Mz*2*a*b| = |Mz*2*sqrt(1-abs(B).^2)*B|. 
 % If we set this = |Mxy_1|, we can solve for |B| via solving quadratic equation
-% 4*Mz^2*(1-B^2)*B^2 = Mxy^2. 
+% 4*Mz^2*(1-B^2)*B^2 = |Mxy_1|^2. 
 % Subsequently solve for |A|, and get phase of A via min-phase, and 
 % then get phase of B by dividing phase of A from first pulse's Mxy phase.
 for jj = 2:Nseg
