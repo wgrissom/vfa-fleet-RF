@@ -1,0 +1,114 @@
+\documentclass[11pt]{article}
+% Command line: pdflatex -shell-escape LT_Pulse.tex
+\usepackage{geometry} 
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{times}
+\usepackage{bm}
+\usepackage{fixltx2e}
+\usepackage[outerbars]{changebar}
+\usepackage{graphicx}
+\usepackage{epstopdf}
+\usepackage{color}
+\usepackage{tabularx}
+
+\epstopdfsetup{suffix=} % to remove 'eps-to-pdf' suffix from converted images
+%\usepackage{todonotes} % use option disable to hide all comments
+
+\usepackage[sort&compress]{natbib}
+\bibpunct{[}{]}{,}{n}{,}{,}
+
+\usepackage[noend]{algpseudocode}
+
+\usepackage{dsfont}
+\usepackage{relsize}
+\usepackage{gensymb}
+
+%changing the Eq. tag to use [] when numbering. use \eqref{label} to reference equations in text.
+\makeatletter
+  \def\tagform@#1{\maketag@@@{[#1]\@@italiccorr}}
+\makeatother
+
+\linespread{1}
+%\setlength{\parindent}{0in}
+
+% the following command can be used to mark changes made due to reviewers' concerns. Use as \revbox{Rx.y} for reviewer x, concern y.
+\newcommand{\revbox}[1]{\marginpar{\framebox{#1}}}
+%\newcommand{\revbox}[1]{}
+
+%\newcommand{\bop}{$\vert B_1^+ \vert$}
+\newcommand{\kt}{$k_\textrm{T}$}
+\newcommand{\bone}{$B_1^+$}
+\newcommand{\bmap}{$B_1^+$}
+\newcommand{\mytilde}{\raise.17ex\hbox{$\scriptstyle\mathtt{\sim}$}}  % tilde symbol
+\mathchardef\mhyphen="2D
+
+\begin{document}
+
+
+
+\newpage
+
+\title{Shinnar-Le Roux RF Pulse Design for Variable Flip Angle FLEET: Theory}
+\author{Will Grissom}
+\maketitle
+\begin{flushleft}
+Vanderbilt University Institute of Imaging Science \\
+Department of Biomedical Engineering \\
+Vanderbilt University, Nashville, TN, United States \\
+\end{flushleft}
+\thispagestyle{plain}
+
+\pagebreak
+
+In variable flip angle (VFA) FLEET acquisitions, 
+interleaved segments of EPI readouts are acquired consecutively, 
+with no delay between them. 
+This reduces the likelihood of phase shifts and motion between segments which otherwise 
+cause ghosting and motion artifacts in conventional segmented acquisitions. 
+Because of the short recovery times between RF pulses in VFA-FLEET,
+there is negligible time for longitudinal relaxation, 
+and the longitudinal magnetization available immediately before each RF pulse is a function of both 
+the previous RF pulse's rotation parameters
+and the longitudinal magnetization available immediately before the previous RF pulse.
+Thus, the longitudinal magnetization profile changes between excitations and must be accounted for in the RF pulse design in order
+to maintain a consistent transverse magnetization (signal) profile across the imaged slice. 
+In this document, I describe a strategy to recursively design slice-selective RF pulses for FLEET acquisitions using the Shinnar-Le Roux (SLR) algorithm.
+
+\par There are two boundary conditions for this problem. 
+Because longitudinal magnetization is replenished during the long delay between the last segment of one acquisition and the first segment of the next, 
+we assume $M_z = 1$ before the first pulse, 
+and the last pulse should have a 90-degree flip angle to maximize signal by completely depleting the remaining longitudinal magnetization.
+Since the longitudinal magnetization before the last pulse is unknown, 
+we must start by designing the first pulse.
+However, designing this pulse requires knowledge of its nominal passband flip angle,
+which can be calculated recursively starting with the last flip angle as:
+\begin{equation}
+\theta_{i-1} = \tan^{-1} \sin \theta_i,
+\end{equation}
+where $i$ indexes segments.
+Given the first pulse's flip angle, the conventional SLR algorithm can be used to calculate the first pulse. 
+That pulse will have rotation parameters $A_1$ and $B_1$, which are functions of frequency.
+Given those parameters, the longitudinal magnetization before the second segment's pulse is:
+\begin{equation}
+M_z^{i+1} = M_z^i \left( 1 - 2 \vert B_i \vert^2\right). 
+\end{equation}
+To solve for the second segment's pulse, 
+we need its complex-valued $B$ profile. 
+First we solve for its magnitude, 
+using the fact that the magnitude of the transverse magnetization it excites should be the same as the first pulse's magnitude,
+as:
+\begin{equation}
+\vert M_{xy}^1 \vert = \vert M_{xy}^{i+1} \vert =  \vert M_z^{i+1} 2 A^*_{i+1} B_{i+1} \vert = \vert M_z^{i+1} \vert 2 \sqrt{1 - \vert B_{i+1} \vert^2} \vert B_{i+1} \vert,
+\end{equation}
+where the last equality results from the fact that $\vert A \vert^2 + \vert B \vert^2 = 1$.
+This equation is quadratic in $\vert B_{i+1} \vert^2$, so the quadratic equation can be applied to solve for $\vert B_{i+1} \vert$.
+Then the complex-valued $A_{i+1}$ can be solved by assuming a min-power pulse [Pauly SLR],
+and the phase of $B_{i+1}$ can be obtained from $A_{i+1}$ and $M_{xy}^1$ as:
+\begin{equation}
+\angle B_{i+1} = \angle \left(\frac{M_{xy}^1}{M_z^{i+1} 2 A_{i+1}^* }\right).
+\end{equation}
+Then the RF pulse for segment $i+1$ can be calculated from the complex-valued $A$ and $B$ profiles using the inverse SLR transform. 
+
+\end{document}
