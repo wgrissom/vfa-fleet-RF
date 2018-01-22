@@ -15,8 +15,14 @@
 
 addpath util/
 
+T1g = 1500; % ms, ~T1 of gray matter at 3T
+T1w = 750; % ms, ~T1 of white matter at 3T
+T1 = Inf; % which T1 to use in pulse design. 
+% set T1 = Inf; to ignore longitudinal relaxation
+TRseg = 2000/30; % time between segment excitations
+
 % parameters
-Nseg = 4; % number of segments
+Nseg = 3; % number of segments
 tb = 4; % time-bandwidth product
 N = 2000; % number of time points in the first segment pulse
 zPadFact = 4;   % zero-pad factor; keep high to capture increasing spatial
@@ -28,7 +34,7 @@ winTruncFact = 1.5; % widening factor compared to first pulse; varying
                     % in pulse duration versus slice profile consistency
                     
 
-% get initial flip angle given this number of segments
+% get initial flip angle given this number of segments. 
 flip = zeros(Nseg,1);flip(end) = 90;
 for jj = Nseg-1:-1:1
     flip(jj) = atand(sind(flip(jj+1)));
@@ -76,7 +82,7 @@ Mxy(:,1) = 2*conj(A(:)).*B; % this is the magnetization profile we want all
 for jj = 2:Nseg
     
     % calculate Mz profile after previous pulse
-    Mz = Mz.*(1-2*abs(B).^2);
+    Mz = Mz.*(1-2*abs(B).^2)*exp(-TRseg/T1)+(1-exp(-TRseg/T1));
     
     % set up quadratic equation to get |B|
     cq = -abs(Mxy(:,1)).^2;
@@ -125,7 +131,7 @@ Mxy_sameRF(:,1) = 2*conj(A).*B;
 for jj = 2:Nseg
     
     % calculate Mz profile after previous pulse
-    Mz = Mz.*(1-2*abs(B).^2);
+    Mz = Mz.*(1-2*abs(B).^2)*exp(-TRseg/T1)+(1-exp(-TRseg/T1));
     [A,B] = abr(-1i*[rf(:,1);0]*sind(flip(jj)/2)/sind(flip(1)/2),...
         [ones(1,zPadFact*N) -0.5]*2*pi/(zPadFact*N),...
         -N*zPadFact/2:1:N*zPadFact/2-1);

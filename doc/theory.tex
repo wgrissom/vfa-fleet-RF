@@ -86,6 +86,7 @@ However, designing this pulse requires knowledge of its nominal passband flip an
 which can be calculated recursively starting with the last flip angle as:
 \begin{equation}
 \theta_{i-1} = \tan^{-1} \sin \theta_i,
+\label{eq:fliprecursion}
 \end{equation}
 where $i$ indexes segments.
 Given the first pulse's flip angle, the conventional SLR algorithm can be used to calculate the first pulse. 
@@ -110,5 +111,28 @@ and the phase of $B_{i+1}$ can be obtained from $A_{i+1}$ and $M_{xy}^1$ as:
 \angle B_{i+1} = \angle \left(\frac{M_{xy}^1}{M_z^{i+1} 2 A_{i+1}^* }\right).
 \end{equation}
 Then the RF pulse for segment $i+1$ can be calculated from the complex-valued $A$ and $B$ profiles using the inverse SLR transform. 
+
+\par It is possible to take into account the effect of longitudinal relaxation in the pulse designs, 
+by modifying the $M_z$ equation as:
+\begin{equation}
+M_z^{i+1} = M_z^i \left( 1 - 2 \vert B_i \vert^2\right)e^{-TR_{seg}/T_1} + M_0\left(1 - e^{-TR_{seg}/T_1}\right),
+\label{eq:MzT1}
+\end{equation}
+where $TR_{seg}$ is the time between excitation of each segment. 
+Note that we should also adjust the first flip angle to account for longitudinal relaxation in the sequence,
+or else we may not use all the available signal. 
+This is complicated by the fact that Eq. \ref{eq:fliprecursion} is derived by setting consecutively excited transverse magnetizations equal to each
+other, as:
+\begin{align}
+M_{xy}^{i} &= M_{xy}^{i+1} \\
+M_z^{i}\sin \theta_{i} &= M_z^{i+1}\sin \theta_{i+1} \\
+				&= \left(M_z^{i}\cos \theta_{i} e^{-TR_{seg}/T_1} + M_0\left(1-e^{-TR_{seg}/T_1}\right)\right) \sin \theta_{i+1}.
+\end{align}
+The recursion in Eq. \ref{eq:fliprecursion} is obtained by assuming $T_1 \approx \infty$, 
+in which case the unknown $M_z^i$ divides out of the above equation.
+If a finite $T_1$ is assumed, this is no longer the case and a more sophisticated solution is needed.
+For now, we are ignoring this effect since it should only result in a slightly reduced signal, 
+but the slice profiles will still be maintained if we include the modification of Eq. \ref{eq:MzT1} in the design. 
+
 
 \end{document}
