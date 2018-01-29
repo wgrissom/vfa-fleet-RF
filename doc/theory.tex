@@ -149,11 +149,11 @@ Substituting this expression for $B^{se}$ into Eq. \ref{eq:mzrecursion}, we get:
 M_z^{i+1} &= M_z^i \left( 1 - 2 \left( \vert A^{ex} B^{ref} \vert^2 + \vert (A^{ref})^* B^{ex} \vert^2 + 2\Re \left\{ A^{ex} B^{ref} (A^{ref})^* B^{ex} e^{\imath \phi(x)} \right\} \right) \right) \\
 &\approx M_z^i \left(1 - 2\vert A^{ex} B^{ref} \vert^2\right),
 \end{align}
-where the approximation is based on the fact that $A^{ref} \approx \cos\left(\pi/2\right) = 0$, 
+where the approximation comes from the fact that $A^{ref} \approx \cos\left(\pi/2\right) = 0$, 
 and that $e^{\imath \phi(x)}$ integrates to zero through the slice. 
-Unlike in Eq. \ref{eq:mzrecursion},
+Unlike the gradient echo case,
 because both $A^{ex}$ and $B^{ref}$ have magnitudes close to 1, 
-the sign of $M_z$ will flip each pulse. 
+the sign of $M_z$ will flip between each segment. 
 This will be coupled into the design via Eq. \ref{eq:bphase}.
 
 
