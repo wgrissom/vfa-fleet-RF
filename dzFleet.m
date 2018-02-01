@@ -15,11 +15,6 @@
 
 addpath util/
 
-T1g = 1500; % ms, ~T1 of gray matter at 3T
-T1w = 750; % ms, ~T1 of white matter at 3T
-T1 = Inf; % which T1 to use in pulse design. 
-% set T1 = Inf; to ignore longitudinal relaxation
-TRseg = 2000/30; % time between segment excitations
 
 % parameters
 Nseg = 3; % number of segments
@@ -29,10 +24,18 @@ zPadFact = 4;   % zero-pad factor; keep high to capture increasing spatial
                 % frequencies in the slice profile with each segment
 cancelAlphaPhs = true;  % cancel the alpha phase using the beta polynomial
                         % (no reason to change this)
-winTruncFact = 1.5; % widening factor compared to first pulse; varying
+winTruncFact = 1.75; % widening factor compared to first pulse; varying
                     % this between 1 and zPadFact will trade off increase
                     % in pulse duration versus slice profile consistency
-                    
+seSeq = false; % false: GRE sequence (typical); true: SE sequence
+tbRef = 8; % time-bandwidth of refocusing pulse if SE sequence
+
+% T1 compensation parameters                    
+T1g = 1500; % ms, ~T1 of gray matter at 3T
+T1w = 750; % ms, ~T1 of white matter at 3T
+T1 = Inf; % which T1 to use in pulse design. 
+% set T1 = Inf; to ignore longitudinal relaxation
+TRseg = 2000/30; % time between segment excitations
 
 % get initial flip angle given this number of segments. 
 flip = zeros(Nseg,1);flip(end) = 90;
@@ -54,6 +57,13 @@ b(:,1) = ift(B);
 b(:,1) = b(:,1)*sind(flip(1)/2); % scale to first flip in passband
 % get RF from this centered + scaled beta polynomial
 rf(:,1) = b2rf(b(:,1));
+
+if seSeq % design a refocusing pulse
+    bRef = zeros(zPadFact*N,1); % refocusing beta polynomial
+    [~,bRef(zPadFact*N/2-N/2+1:zPadFact*N/2+N/2,1)] = dzrf(N,tbRef,'se','ls',0.01,0.01);
+    BrefMag = abs(ft(bRef)); % get beta profile so we can account for it in calculating Mz
+    ArefMag = abs(sqrt(1-BrefMag.^2));
+end
 
 if cancelAlphaPhs
     % cancel a phase by absorbing into b
@@ -82,7 +92,16 @@ Mxy(:,1) = 2*conj(A(:)).*B; % this is the magnetization profile we want all
 for jj = 2:Nseg
     
     % calculate Mz profile after previous pulse
-    Mz = Mz.*(1-2*abs(B).^2)*exp(-TRseg/T1)+(1-exp(-TRseg/T1));
+    if ~seSeq % gre sequence
+        Mz = Mz.*(1-2*abs(B).^2)*exp(-TRseg/T1)+(1-exp(-TRseg/T1));
+    else % se sequence
+        Mz = Mz.*(1-2*(abs(A(:).*BrefMag).^2 + abs(ArefMag.*B).^2)); % second term is about 1%
+    end
+    %figure;
+    %subplot(131),plot(Mz);
+    %subplot(132),plot(abs(A(:).*BrefMag));
+    %subplot(133),plot(abs(ArefMag.*B));
+    %pause
     
     % set up quadratic equation to get |B|
     cq = -abs(Mxy(:,1)).^2;
