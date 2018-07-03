@@ -1,4 +1,4 @@
-function [rf, Mxy, rfRef] = dzFleet(Nseg, tb, Npts, zPadFact, winFact, aphs, plotAll, T1, TRseg, seSeq, tbRef)
+function [rf, Mxy, rfRef] = dzFleet(Nseg, tb, Npts, zPadFact, winFact, aphs, plotAll, T1, TRseg, useMz, seSeq, tbRef)
 % DZFLEET
 % Generate RF pulses for steady slice profiles in FLEET
 %
@@ -19,6 +19,8 @@ function [rf, Mxy, rfRef] = dzFleet(Nseg, tb, Npts, zPadFact, winFact, aphs, plo
 % T1        Longitudinal relaxation rate to use in pulse design [ms].
 %           Default = Inf. Consider T1 GM = 1500 ms and T1 WM = 750 ms.
 % TRseg     Time between excitations [ms]. Default = 60 ms.
+% useMz     Use the residual Mz from the previous pulse. Default = true.
+%           If false, then the pulses will be conventional VFA
 % seSeq     false: GRE sequence (typical); true: SE sequence
 % tbRef     time-bandwidth of refocusing pulse if seSeq == true
 %
@@ -76,6 +78,9 @@ if ~exist('T1', 'var') || isempty(T1)
 end
 if ~exist('TRseg', 'var') || isempty(TRseg)
     TRseg = 60; % time between segment excitations, ms
+end
+if ~exist('useMz', 'var') || isempty(useMz)
+    useMz = true;
 end
 if ~exist('seSeq', 'var') || isempty(seSeq)
     seSeq = false; % false: GRE sequence (typical); true: SE sequence
@@ -168,16 +173,26 @@ for jj = 2:Nseg
         Mz = Mz.*(1-2*(abs(A(:).*BrefMag).^2 + abs(ArefMag.*B).^2)); % second term is about 1%
     end
 
-    % set up quadratic equation to get |B|
-    cq = -abs(Mxy(:,1)).^2;
-    bq = 4*Mz.^2;
-    aq = -4*Mz.^2;
-    Bmag = sqrt((-bq+sqrt(bq.^2-4*aq.*cq))./(2*aq));
-    % get A - easier to get complex A than complex B since |A| is
-    % determined by |B|, and phase is gotten by min-phase relationship
-    A = ft(b2a(ift(Bmag))); % Phase of B doesn't matter here since only profile mag is used by b2a
-    % trick: now we can get complex B from ratio of Mxy and A
-    B = Mxy(:,1)./(2*conj(A(:)).*Mz);
+    if useMz % design the pulses accounting for the actual Mz profile (the full method)
+
+      % set up quadratic equation to get |B|
+      cq = -abs(Mxy(:,1)).^2;
+      bq = 4*Mz.^2;
+      aq = -4*Mz.^2;
+      Bmag = sqrt((-bq+sqrt(bq.^2-4*aq.*cq))./(2*aq));
+      % get A - easier to get complex A than complex B since |A| is
+      % determined by |B|, and phase is gotten by min-phase relationship
+      A = ft(b2a(ift(Bmag))); % Phase of B doesn't matter here since only profile mag is used by b2a
+      % trick: now we can get complex B from ratio of Mxy and A
+      B = Mxy(:,1)./(2*conj(A(:)).*Mz);
+
+    else % design assuming ideal Mz (conventional VFA)
+
+      B = B*sind(flip(jj)/2)/sind(flip(jj-1)/2);
+      A = ft(b2a(ift(B))); % Phase of B doesn't matter here since only profile mag is used by b2a
+
+    end
+
     Mxy(:,jj) = Mz.*(2*conj(A(:)).*B);
 
     % get polynomial

@@ -15,8 +15,10 @@ T1 = Inf; % Longitudinal relaxation rate to use in pulse design [ms].
 TRseg = 60; % Time between excitations [ms].
 seSeq = false; % false: GRE sequence (typical); true: SE sequence
 tbRef = 8; % time-bandwidth of refocusing pulse if seSeq == true
+useMz = true; % Use the residual Mz from the previous pulse. Default = true.
+               % If false, then the pulses will be conventional VFA
 
 addpath util/
 
 rf = dzFleet(Nseg, tb, Npts, zPadFact, winFact, cancelAlphaPhs, plotAll, T1, ...
-              TRseg, seSeq, tbRef);
+              TRseg, useMz, seSeq, tbRef);
