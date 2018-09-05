@@ -108,7 +108,7 @@ Mz = ones(zPadFact*N,1); % Mz profile after each pulse
 Mxy = zeros(zPadFact*N,Nseg); % slice profiles
 
 % design first RF pulse; Mz is relaxed here
-b(zPadFact*N/2-N/2+1:zPadFact*N/2+N/2,1) = dzrf(N,tb,'st','ls',0.0001,0.01);
+b(zPadFact*N/2-N/2+1:zPadFact*N/2+N/2,1) = dzrf(N,tb,'st','ls',0.01,0.01);
 % shift beta so that RF is centered, and we get no phase in beta response
 B = ft(b(:,1));
 B = B.*exp(-1i*2*pi/(N*zPadFact)*1/2*(-N*zPadFact/2:N*zPadFact/2-1)');
@@ -121,6 +121,7 @@ if seSeq % design a refocusing pulse
     bRef = zeros(zPadFact*N,1); % refocusing beta polynomial
     [rfRef,bRef(zPadFact*N/2-N/2+1:zPadFact*N/2+N/2,1)] = dzrf(N,tbRef,'se','ls',0.01,0.01);
     BrefMag = abs(ft(bRef)); % get beta profile so we can account for it in calculating Mz
+    BrefMag = BrefMag./max(BrefMag);
     ArefMag = abs(sqrt(1-BrefMag.^2));
 end
 
@@ -172,6 +173,7 @@ for jj = 2:Nseg
     else % se sequence
         Mz = Mz.*(1-2*(abs(A(:).*BrefMag).^2 + abs(ArefMag.*B).^2)); % second term is about 1%
     end
+    %figure;plot(Mz);
 
     if useMz % design the pulses accounting for the actual Mz profile (the full method)
 
@@ -221,23 +223,25 @@ end
 Mxy = Mxy.*repmat(exp(1i*2*pi/N*(zPadFact*N/2)*(-N/2:1/zPadFact:N/2-1/zPadFact)'),[1 Nseg]);
 
 % also look at case with pulse 1 scaled to different flips
-Mz = ones(zPadFact*N,1);
-Mxy_sameRF = zeros(zPadFact*N,Nseg);
-[A,B] = abr(-1i*[rf(:,1);0],[ones(1,zPadFact*N) -0.5]*2*pi/(zPadFact*N),...
-    -N*zPadFact/2:1:N*zPadFact/2-1);
-Mxy_sameRF(:,1) = 2*conj(A).*B;
-for jj = 2:Nseg
-
-    % calculate Mz profile after previous pulse
-    Mz = Mz.*(1-2*abs(B).^2)*exp(-TRseg/T1)+(1-exp(-TRseg/T1));
-    [A,B] = abr(-1i*[rf(:,1);0]*sind(flip(jj)/2)/sind(flip(1)/2),...
-        [ones(1,zPadFact*N) -0.5]*2*pi/(zPadFact*N),...
+if ~seSeq
+    Mz = ones(zPadFact*N,1);
+    Mxy_sameRF = zeros(zPadFact*N,Nseg);
+    [A,B] = abr(-1i*[rf(:,1);0],[ones(1,zPadFact*N) -0.5]*2*pi/(zPadFact*N),...
         -N*zPadFact/2:1:N*zPadFact/2-1);
-    Mxy_sameRF(:,jj) = 2*Mz.*conj(A).*B;
-
-end
-Mxy_sameRF = Mxy_sameRF.*...
-    repmat(exp(1i*2*pi/N*(zPadFact*N/2)*(-N/2:1/zPadFact:N/2-1/zPadFact)'),[1 Nseg]);
+    Mxy_sameRF(:,1) = 2*conj(A).*B;
+    for jj = 2:Nseg
+        
+        % calculate Mz profile after previous pulse
+        Mz = Mz.*(1-2*abs(B).^2)*exp(-TRseg/T1)+(1-exp(-TRseg/T1));
+        [A,B] = abr(-1i*[rf(:,1);0]*sind(flip(jj)/2)/sind(flip(1)/2),...
+            [ones(1,zPadFact*N) -0.5]*2*pi/(zPadFact*N),...
+            -N*zPadFact/2:1:N*zPadFact/2-1);
+        Mxy_sameRF(:,jj) = 2*Mz.*conj(A).*B;
+        
+    end
+    Mxy_sameRF = Mxy_sameRF.*...
+        repmat(exp(1i*2*pi/N*(zPadFact*N/2)*(-N/2:1/zPadFact:N/2-1/zPadFact)'),[1 Nseg]);
+end 
 
 % truncate the RF
 if winTruncFact < zPadFact % then we need to truncate
@@ -261,28 +265,39 @@ if plotAll
     subplot(2,2,2)
     plot(abs(sum(Mxy)));
     hold on
-    plot(abs(sum(Mxy_sameRF)));
-    legend('SLR-VFA','Conventional VFA')
+    if ~seSeq
+        plot(abs(sum(Mxy_sameRF)));
+        legend('SLR-VFA','Conventional VFA')
+    else
+        legend('SLR-VFA');
+    end
     xlabel 'Segment'
     ylabel '|\int M_{xy}| (a.u.)'
     title 'Amplitude of integrated slice profile'
 
+    x = -N/2:1/zPadFact:N/2-1/zPadFact;
     subplot(2,2,3)
-    plot(real(Mxy));
+    plot(x,real(Mxy));
     hold on
-    plot(imag(Mxy));
+    plot(x,imag(Mxy));
+    c = axis;
+    axis([-4*tb 4*tb c(3:4)]);
     title 'SLR-VFA Mxy Profiles'
     ylabel '/M_0'
     xlabel 'frequency index'
 
-    subplot(2,2,4)
-    plot(real(Mxy_sameRF));
-    hold on
-    plot(imag(Mxy_sameRF));
-    title 'Conventional VFA Mxy Profiles (First pulse scaled)'
-    ylabel '/M_0'
-    xlabel 'frequency index'
-
+    if ~seSeq
+        subplot(2,2,4)
+        plot(x,real(Mxy_sameRF));
+        hold on
+        plot(x,imag(Mxy_sameRF));
+        c = axis;
+        axis([-4*tb 4*tb c(3:4)]);
+        title 'Conventional VFA Mxy Profiles (First pulse scaled)'
+        ylabel '/M_0'
+        xlabel 'frequency index'
+    end
+    
     % Plot slice profile magn and phase
     Mxy_mag = abs(Mxy);
     Mxy_pha = angle(Mxy);
@@ -290,13 +305,17 @@ if plotAll
 
     figure;
     subplot(2,1,1);
-    plot(Mxy_mag);
+    plot(x,Mxy_mag);
+    c = axis;
+    axis([-4*tb 4*tb c(3:4)]);
     title 'SLR-VFA Mxy Profiles'
     ylabel 'magnitude'
     xlabel 'frequency index'
 
     subplot(2,1,2);
-    plot(Mxy_pha);
+    plot(x,Mxy_pha);
+    c = axis;
+    axis([-4*tb 4*tb c(3:4)]);
     title 'SLR-VFA Mxy Profiles'
     ylabel 'phase  [rad]'
     xlabel 'frequency index'
