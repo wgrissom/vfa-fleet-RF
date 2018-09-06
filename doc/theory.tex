@@ -103,6 +103,7 @@ using the fact that the magnitude of the transverse magnetization it excites sho
 as:
 \begin{equation}
 \vert M_{xy}^1 \vert = \vert M_{xy}^{i+1} \vert =  \vert M_z^{i+1} 2 A^*_{i+1} B_{i+1} \vert = \vert M_z^{i+1} \vert 2 \sqrt{1 - \vert B_{i+1} \vert^2} \vert B_{i+1} \vert,
+\label{eq:mxygre}
 \end{equation}
 where the last equality results from the fact that $\vert A \vert^2 + \vert B \vert^2 = 1$.
 If we square this equation we get an 
@@ -156,6 +157,20 @@ Unlike the gradient echo case,
 because both $A^{ex}$ and $B^{ref}$ have magnitudes close to 1, 
 the sign of $M_z$ will flip between each segment. 
 This will be coupled into the design via Eq. \ref{eq:bphase}.
+
+\par When a low refocusing time-bandwidth product is used, 
+the refocusing pulse's $B$ profile must be accounted for in the equations for $M_{xy}$ and subsequently 
+the excitation pulse's $B$ profile.
+That is, we need to account for the fact that we are matching the $M_{xy}$ profiles not at the end of the excitation pulse,
+but at the time of the spin echo, after the refocusing pulse has been applied. 
+If this is not done, then for low refocusing time-bandwidths or thin refocusing slices, 
+the zero-crossings of the $M_z$ profile can create spikes in the target $B$ profile. 
+The equivalent of Eq \ref{eq:mxygre} in the spin echo case is:
+\begin{equation}
+\vert M_{xy}^1 \vert = \vert M_{xy}^{i+1} \vert =  \vert -M_z^{i+1} 2 A_{i+1} B^*_{i+1} B^2_{ref} \vert = \vert M_z^{i+1} B^2_{ref} \vert 2 \sqrt{1 - \vert B_{i+1} \vert^2} \vert B_{i+1} \vert,
+\label{eq:mxyse}
+\end{equation}
+where $B_{ref}$ is the refocusing pulse's $B$ profile. 
 
 
 \end{document}

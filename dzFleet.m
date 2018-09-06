@@ -96,10 +96,24 @@ elseif ( winTruncFact < 1 )
     error('dzFleet:win', 'winFact must be greater than or equal to 1.');
 end
 
+if seSeq % design a refocusing pulse
+    bRef = zeros(zPadFact*N,1); % refocusing beta polynomial
+    [rfRef,bRef(zPadFact*N/2-N/2+1:zPadFact*N/2+N/2,1)] = dzrf(N,tbRef,'se','ls',0.01,0.01);
+    Bref = ft(bRef);
+    Bref = Bref./max(abs(Bref));
+    BrefMag = abs(Bref); % get beta profile so we can account for it in calculating Mz
+    ArefMag = abs(sqrt(1-BrefMag.^2));
+    flipRef = 2*asind(BrefMag(zPadFact*N/2+1));
+end
+
 % get initial flip angle given this number of segments.
 flip = zeros(Nseg,1);flip(end) = 90;
 for jj = Nseg-1:-1:1
-    flip(jj) = atand(sind(flip(jj+1)));
+    if ~seSeq
+        flip(jj) = atand(sind(flip(jj+1)));
+    else 
+        flip(jj) = atand(cosd(flipRef)*sind(flip(jj+1)));
+    end
 end
 
 b = zeros(zPadFact*N,Nseg); % beta polynomials
@@ -113,17 +127,11 @@ b(zPadFact*N/2-N/2+1:zPadFact*N/2+N/2,1) = dzrf(N,tb,'st','ls',0.01,0.01);
 B = ft(b(:,1));
 B = B.*exp(-1i*2*pi/(N*zPadFact)*1/2*(-N*zPadFact/2:N*zPadFact/2-1)');
 b(:,1) = ift(B);
-b(:,1) = b(:,1)*sind(flip(1)/2); % scale to first flip in passband
+b(:,1) = b(:,1)./max(abs(B))*sind(flip(1)/2); % scale to first flip in passband.
+% we have to divide by max(abs(B)) because dzrf does not guarantee that B
+% has a max of 1.
 % get RF from this centered + scaled beta polynomial
 rf(:,1) = b2rf(b(:,1));
-
-if seSeq % design a refocusing pulse
-    bRef = zeros(zPadFact*N,1); % refocusing beta polynomial
-    [rfRef,bRef(zPadFact*N/2-N/2+1:zPadFact*N/2+N/2,1)] = dzrf(N,tbRef,'se','ls',0.01,0.01);
-    BrefMag = abs(ft(bRef)); % get beta profile so we can account for it in calculating Mz
-    BrefMag = BrefMag./max(BrefMag);
-    ArefMag = abs(sqrt(1-BrefMag.^2));
-end
 
 if cancelAlphaPhs
     % cancel a phase by absorbing into b
@@ -157,8 +165,12 @@ if winTruncFact < zPadFact % then we need to apply windowing
 end
 
 % use A and B to get Mxy
-Mxy(:,1) = 2*conj(A(:)).*B; % this is the magnetization profile we want all
-                            % other pulses to produce
+if ~seSeq
+    Mxy(:,1) = 2*conj(A(:)).*B; % this is the magnetization profile we want all
+                                % other pulses to produce
+else 
+    Mxy(:,1) = 2*A(:).*conj(B).*Bref.^2;
+end
 
 % Amplitude of next pulse's Mxy profile will be |Mz*2*a*b| = |Mz*2*sqrt(1-abs(B).^2)*B|.
 % If we set this = |Mxy_1|, we can solve for |B| via solving quadratic equation
@@ -179,9 +191,17 @@ for jj = 2:Nseg
 
       % set up quadratic equation to get |B|
       cq = -abs(Mxy(:,1)).^2;
-      bq = 4*Mz.^2;
-      aq = -4*Mz.^2;
-      Bmag = sqrt((-bq+sqrt(bq.^2-4*aq.*cq))./(2*aq));
+      if ~seSeq
+        bq = 4*Mz.^2;
+        aq = -4*Mz.^2;
+        %figure;plot(real(Mz));hold on;plot(abs(Mxy(:,1)));
+      else
+        bq = 4*(BrefMag.^4).*Mz.^2;
+        aq = -4*(BrefMag.^4).*Mz.^2;
+        %figure;plot(abs(real(Mz.*Bref.^2)));hold on;plot(abs(Mxy(:,1)));
+      end
+      Bmag = sqrt((-bq+real(sqrt(bq.^2-4*aq.*cq)))./(2*aq));
+      Bmag(isnan(Bmag)) = 0;
       % get A - easier to get complex A than complex B since |A| is
       % determined by |B|, and phase is gotten by min-phase relationship
       A = ft(b2a(ift(Bmag))); % Phase of B doesn't matter here since only profile mag is used by b2a
@@ -195,8 +215,12 @@ for jj = 2:Nseg
 
     end
 
-    Mxy(:,jj) = Mz.*(2*conj(A(:)).*B);
-
+    if ~seSeq
+        Mxy(:,jj) = Mz.*(2*conj(A(:)).*B);
+    else
+        Mxy(:,jj) = Mz.*(2*A(:).*conj(B).*Bref.^2);
+    end 
+    
     % get polynomial
     b(:,jj) = ift(B);
 
@@ -212,7 +236,11 @@ for jj = 2:Nseg
         % recalculate B and Mxy
         B = ft(b(:,jj));
         A = ft(b2a(b(:,jj))); % Phase of B doesn't matter here since only profile mag is used by b2a
-        Mxy(:,jj) = Mz.*(2*conj(A(:)).*B); % recalculate Mxy after windowing
+        if ~seSeq
+            Mxy(:,jj) = Mz.*(2*conj(A(:)).*B);
+        else
+            Mxy(:,jj) = Mz.*(2*A(:).*conj(B).*Bref.^2);
+        end 
     end
 
     % get RF
@@ -261,6 +289,11 @@ if plotAll
     title 'RF pulses'
     ylabel 'radians'
     xlabel 'time index'
+    legendText = {};
+    for ii = 1:Nseg
+        legendText{ii} = ['Seg ' num2str(ii)];
+    end
+    legend(legendText);
 
     subplot(2,2,2)
     plot(abs(sum(Mxy)));
