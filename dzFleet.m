@@ -1,5 +1,5 @@
 function [rf, Mxy, rfRef] = dzFleet(Nseg, tb, Npts, zPadFact, winFact, ...
-    aphs, plotAll, T1, TRseg, useMz, seSeq, tbRef)
+    aphs, plotAll, T1, TRseg, useMz, seSeq, tbRef, refGradScale)
 % DZFLEET
 % Generate RF pulses for steady slice profiles in FLEET
 %
@@ -89,11 +89,14 @@ end
 if ~exist('tbRef', 'var') || isempty(tbRef)
     tbRef = 8; % time-bandwidth of refocusing pulse if SE sequence
 end
+if ~exist('refGradScale', 'var') || isempty(refGradScale)
+    refGradScale = 1;
+end
 
-if ( winTruncFact > zPadFact )
+if winTruncFact > zPadFact
     warning('dzFleet:win', 'winFact is greater than zPadFact, will set winFact = zPadFact.');
     winTruncFact = zPadFact;
-elseif ( winTruncFact < 1 )
+elseif winTruncFact < 1
     error('dzFleet:win', 'winFact must be greater than or equal to 1.');
 end
 
@@ -101,6 +104,13 @@ if seSeq % design a refocusing pulse
     bRef = zeros(zPadFact*N,1); % refocusing beta polynomial
     [rfRef,bRef(zPadFact*N/2-N/2+1:zPadFact*N/2+N/2,1)] = dzrf(N,tbRef,'se','ls',0.01,0.01);
     Bref = ft(bRef);
+    if refGradScale ~= 1
+        % interpolate the refocusing profile given difference in gradient
+        % scaling
+        xin = linspace(-1,1,zPadFact*N);
+        xout = linspace(-refGradScale,refGradScale,zPadFact*N);
+        Bref = interp1(xin,Bref,xout,'spline',0);Bref = Bref(:);
+    end
     Bref = Bref./max(abs(Bref));
     BrefMag = abs(Bref); % get beta profile so we can account for it in calculating Mz
     ArefMag = abs(sqrt(1-BrefMag.^2));
@@ -301,11 +311,22 @@ if plotAll
     plot(x,real(Mxy));
     hold on
     plot(x,imag(Mxy));
+    for ii = 1:Nseg
+        legendText{ii} = ['Seg ' num2str(ii) ' Real'];
+    end
+    for ii = Nseg+1:2*Nseg
+        legendText{ii} = ['Seg ' num2str(ii) ' Imag'];
+    end
+    if seSeq
+        plot(x, BrefMag.^2);
+        legendText{2*Nseg+1} = 'Refocusing Efficiency';
+    end
     c = axis;
     axis([-4*tb 4*tb c(3:4)]);
     title 'SLR-VFA Mxy Profiles'
     ylabel '/M_0'
     xlabel 'frequency index'
+    legend(legendText);
 
     if ~seSeq
         subplot(2,2,4)
@@ -317,8 +338,14 @@ if plotAll
         title 'Conventional VFA Mxy Profiles (First pulse scaled)'
         ylabel '/M_0'
         xlabel 'frequency index'
+    else
+        subplot(2,2,4)
+        plot(real(rfRef));
+        title 'Refocusing pulse'
+        xlabel 'time index'
+        ylabel 'radians'
     end
-
+    
     % Plot slice profile magn and phase
     Mxy_mag = abs(Mxy);
     Mxy_pha = angle(Mxy);
