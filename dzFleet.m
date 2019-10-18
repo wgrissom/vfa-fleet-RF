@@ -1,4 +1,5 @@
-function [rf, Mxy, rfRef] = dzFleet(Nseg, tb, Npts, zPadFact, winFact, aphs, plotAll, T1, TRseg, useMz, seSeq, tbRef)
+function [rf, Mxy, rfRef] = dzFleet(Nseg, tb, Npts, zPadFact, winFact, ...
+    aphs, plotAll, T1, TRseg, useMz, seSeq, tbRef)
 % DZFLEET
 % Generate RF pulses for steady slice profiles in FLEET
 %
@@ -111,7 +112,7 @@ flip = zeros(Nseg,1);flip(end) = 90;
 for jj = Nseg-1:-1:1
     if ~seSeq
         flip(jj) = atand(sind(flip(jj+1)));
-    else 
+    else
         flip(jj) = atand(cosd(flipRef)*sind(flip(jj+1)));
     end
 end
@@ -131,15 +132,14 @@ b(:,1) = b(:,1)./max(abs(B))*sind(flip(1)/2); % scale to first flip in passband.
 % we have to divide by max(abs(B)) because dzrf does not guarantee that B
 % has a max of 1.
 % get RF from this centered + scaled beta polynomial
-rf(:,1) = b2rf(b(:,1));
 
+a = b2a(b(:,1));
 if cancelAlphaPhs
     % cancel a phase by absorbing into b
     % Note that we don't have to do this later since it is done here
-    a = b2a(b(:,1));
     b(:,1) = ifft(fft(b(:,1)).*exp(1i*angle(fft((a(:))))));
-    rf(:,1) = b2rf(b(:,1));
 end
+rf(:,1) = b2rf(b(:,1));
 
 % get the min-phase alpha and its response
 a = b2a(b(:,1));
@@ -153,7 +153,7 @@ if winTruncFact < zPadFact % then we need to apply windowing
     Npad = N*zPadFact - winTruncFact*N;
     % TODO: Replace with a tukeywin (built-in MATLAB func)?
     window = blackman((winTruncFact-1)*N);
-    % split it in half; stick N zeros in the middle
+    % split it in half; stick N ones in the middle
     window = [window(1:winLen/2);ones(N,1);window(winLen/2+1:end)];
     window = [zeros(Npad/2,1);window;zeros(Npad/2,1)];
     % apply windowing to first pulse for consistency
@@ -168,7 +168,7 @@ end
 if ~seSeq
     Mxy(:,1) = 2*conj(A(:)).*B; % this is the magnetization profile we want all
                                 % other pulses to produce
-else 
+else
     Mxy(:,1) = 2*A(:).*conj(B).*Bref.^2;
 end
 
@@ -215,32 +215,20 @@ for jj = 2:Nseg
 
     end
 
-    if ~seSeq
-        Mxy(:,jj) = Mz.*(2*conj(A(:)).*B);
-    else
-        Mxy(:,jj) = Mz.*(2*A(:).*conj(B).*Bref.^2);
-    end 
-    
     % get polynomial
     b(:,jj) = ift(B);
 
     if winTruncFact < zPadFact % then we need to apply windowing
-        winLen = (winTruncFact-1)*N;
-        Npad = N*zPadFact - winTruncFact*N;
-        % TODO: Replace with a tukeywin (built-in MATLAB func)?
-        window = blackman((winTruncFact-1)*N);
-        % split it in half; stick N zeros in the middle
-        window = [window(1:winLen/2);ones(N,1);window(winLen/2+1:end)];
-        window = [zeros(Npad/2,1);window;zeros(Npad/2,1)];
         b(:,jj) = b(:,jj).*window;
         % recalculate B and Mxy
         B = ft(b(:,jj));
         A = ft(b2a(b(:,jj))); % Phase of B doesn't matter here since only profile mag is used by b2a
-        if ~seSeq
-            Mxy(:,jj) = Mz.*(2*conj(A(:)).*B);
-        else
-            Mxy(:,jj) = Mz.*(2*A(:).*conj(B).*Bref.^2);
-        end 
+    end
+
+    if ~seSeq
+        Mxy(:,jj) = Mz.*(2*conj(A(:)).*B);
+    else
+        Mxy(:,jj) = Mz.*(2*A(:).*conj(B).*Bref.^2);
     end
 
     % get RF
@@ -258,18 +246,18 @@ if ~seSeq
         -N*zPadFact/2:1:N*zPadFact/2-1);
     Mxy_sameRF(:,1) = 2*conj(A).*B;
     for jj = 2:Nseg
-        
+
         % calculate Mz profile after previous pulse
         Mz = Mz.*(1-2*abs(B).^2)*exp(-TRseg/T1)+(1-exp(-TRseg/T1));
         [A,B] = abr(-1i*[rf(:,1);0]*sind(flip(jj)/2)/sind(flip(1)/2),...
             [ones(1,zPadFact*N) -0.5]*2*pi/(zPadFact*N),...
             -N*zPadFact/2:1:N*zPadFact/2-1);
         Mxy_sameRF(:,jj) = 2*Mz.*conj(A).*B;
-        
+
     end
     Mxy_sameRF = Mxy_sameRF.*...
         repmat(exp(1i*2*pi/N*(zPadFact*N/2)*(-N/2:1/zPadFact:N/2-1/zPadFact)'),[1 Nseg]);
-end 
+end
 
 % truncate the RF
 if winTruncFact < zPadFact % then we need to truncate
@@ -330,7 +318,7 @@ if plotAll
         ylabel '/M_0'
         xlabel 'frequency index'
     end
-    
+
     % Plot slice profile magn and phase
     Mxy_mag = abs(Mxy);
     Mxy_pha = angle(Mxy);
