@@ -1,5 +1,5 @@
 function [rf, Mxy, rfRef] = dzFleet(Nseg, tb, Npts, zPadFact, winFact, ...
-    aphs, plotAll, T1, TRseg, useMz, seSeq, tbRef, refGradScale)
+    aphs, plotAll, T1, TRseg, TE, finalFlip, useMz, seSeq, tbRef, refGradScale)
 % DZFLEET
 % Generate RF pulses for steady slice profiles in FLEET
 %
@@ -78,7 +78,13 @@ if ~exist('T1', 'var') || isempty(T1)
     T1 = Inf; % set T1 = Inf; to ignore longitudinal relaxation
 end
 if ~exist('TRseg', 'var') || isempty(TRseg)
-    TRseg = 60; % time between segment excitations, ms
+    TRseg = 100; % time between segment excitations, ms
+end
+if ~exist('TE', 'var') || isempty(TE)
+    TE = 50; % echo time, ms - only used for SE sequences
+end
+if ~exist('finalFlip', 'var') || isempty(finalFlip)
+    finalFlip = 90; % final flip angle - use 90 for GRE, something smallre for SE depending on Mz evolution
 end
 if ~exist('useMz', 'var') || isempty(useMz)
     useMz = true;
@@ -118,7 +124,7 @@ if seSeq % design a refocusing pulse
 end
 
 % get initial flip angle given this number of segments.
-flip = zeros(Nseg,1);flip(end) = 90;
+flip = zeros(Nseg,1);flip(end) = finalFlip;
 for jj = Nseg-1:-1:1
     if ~seSeq
         flip(jj) = atand(sind(flip(jj+1)));
@@ -193,7 +199,10 @@ for jj = 2:Nseg
     if ~seSeq % gre sequence
         Mz = Mz.*(1-2*abs(B).^2)*exp(-TRseg/T1)+(1-exp(-TRseg/T1));
     else % se sequence
-        Mz = Mz.*(1-2*(abs(A(:).*BrefMag).^2 + abs(ArefMag.*B).^2)); % second term is about 1%
+        Mz = Mz.*(1-2*abs(B).^2)*exp(-TE/2/T1)+(1-exp(-TE/2/T1)); % Mz up to TE/2
+        Mz = Mz.*(1-2*BrefMag.^2)*exp(-(TRseg-TE/2)/T1)+(1-exp(-(TRseg-TE/2)/T1));% Mz from TE/2 -> TRseg
+        %Mz = Mz.*(1-2*(abs(A(:).*BrefMag).^2 + abs(ArefMag.*B).^2)); % second term is about 1%
+        %figure(101);hold on;plot(Mz);axis([3950 4050 -1 1]);
     end
     %figure;plot(Mz);
 
@@ -315,7 +324,7 @@ if plotAll
         legendText{ii} = ['Seg ' num2str(ii) ' Real'];
     end
     for ii = Nseg+1:2*Nseg
-        legendText{ii} = ['Seg ' num2str(ii) ' Imag'];
+        legendText{ii} = ['Seg ' num2str(ii-Nseg) ' Imag'];
     end
     if seSeq
         plot(x, BrefMag.^2);
@@ -359,6 +368,11 @@ if plotAll
     title 'SLR-VFA Mxy Profiles'
     ylabel 'magnitude'
     xlabel 'frequency index'
+    legendText = {};
+    for ii = 1:Nseg
+        legendText{ii} = ['Segment ' num2str(ii)];
+    end
+    legend(legendText);
 
     subplot(2,1,2);
     plot(x,Mxy_pha);
